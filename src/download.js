@@ -8,6 +8,7 @@ const Queue = require('./Queue');
 
 module.exports = (torrent, path) => {
   tracker.getPeers(torrent, peers => {
+    console.log('peers: \n', peers);
     const pieces = new Pieces(torrent);
     const file = fs.openSync(path, 'w');
 
@@ -18,7 +19,10 @@ module.exports = (torrent, path) => {
 function download(peer, torrent, pieces, file) {
   const socket = new net.Socket();
 
-  socket.on('error', () => console.log(`Refused to connect to ${peer.ip}:${peer.port}`));
+  socket.on('error', () => {
+    console.log(`Refused to connect to ${peer.ip}:${peer.port}`);
+    socket.end();
+  });
 
   socket.connect(peer.port, peer.ip, () => {
     console.log(`Connected to ${peer.ip}:${peer.port}`);
@@ -74,7 +78,7 @@ function unchokeHandler(socket, pieces, queue) {
 
 function haveHandler(socket, pieces, queue, payload) {
   const pieceIndex = payload.readUInt32BE(0);
-  const queueEmpty = queue.length === 0;
+  const queueEmpty = queue.length() === 0;
 
   queue.queue(pieceIndex);
   if (queueEmpty) {
@@ -83,7 +87,7 @@ function haveHandler(socket, pieces, queue, payload) {
 }
 
 function bitfieldHandler(socket, pieces, queue, payload) {
-  const queueEmpty = queue.length === 0;
+  const queueEmpty = queue.length() === 0;
 
   payload.forEach((byte, i) => {
     for (let j = 0; j < 8; j++) {
@@ -101,11 +105,11 @@ function bitfieldHandler(socket, pieces, queue, payload) {
 }
 
 function pieceHandler(socket, pieces, queue, torrent, file, pieceResp) {
-  console.log(pieceResp);
+  console.log('piece: \n', pieceResp);
   pieces.addReceived(pieceResp);
 
   const offset = pieceResp.index * torrent.info['piece length'] + pieceResp.begin;
-  fs.write(file, pieceResp.block, offset, () => {});
+  fs.write(file, pieceResp.block, 0, pieceResp.block.length, offset, () => {});
 
   if (pieces.isDone()) {
     socket.end();

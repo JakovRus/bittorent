@@ -7,7 +7,7 @@ const util = require('./util');
 
 module.exports.getPeers = (torrent, callback) => {
   const socket = dgram.createSocket('udp4');
-  const url = torrent.announce.toString('utf8');
+  const url = getUdpUrl(torrent);
 
   udpSend(socket, buildConnReq(), url);
 
@@ -28,6 +28,22 @@ module.exports.getPeers = (torrent, callback) => {
   });
 };
 
+function getUdpUrl(torrent) {
+  const list = torrent['announce-list'];
+  if(!list) {
+    return torrent.announce.toString('utf8');
+  }
+
+  const urls = list.map(url => url.toString('utf8'));
+
+  const udpUrl = urls.find(url => url.slice(0, 3) === 'udp');
+
+  if(!udpUrl) {
+    throw new Error('Tracker doesn\'t response');
+  }
+
+  return udpUrl;
+}
 function udpSend(socket, message, rawUrl, callback = () => {}) {
   const url = urlParse(rawUrl);
   socket.send(message, 0, message.length, url.port, url.hostname, callback);

@@ -4,7 +4,7 @@ module.exports = class {
   constructor(torrent) {
     this._torrent = torrent;
     this._queue = [];
-    this.choked = true;
+    this.choked = false;
   }
 
   queue(pieceIndex) {
