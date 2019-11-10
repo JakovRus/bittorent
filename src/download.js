@@ -2,28 +2,34 @@ const net = require('net');
 const Buffer = require('buffer').Buffer;
 const tracker = require('./tracker');
 const message = require('./message');
+const Pieces = require('./pieces');
 
 module.exports = torrent => {
+  const pieces = new Pieces(torrent.info.pieces.length / 20);
+
   tracker.getPeers(torrent, peers => {
-    peers.forEach(peer => download(peer, torrent));
+    peers.forEach(peer => download(peer, torrent, pieces));
   });
 };
 
-function download(peer, torrent) {
+function download(peer, torrent, pieces) {
   const socket = new net.Socket();
 
   socket.on('error', error => console.log('In ', peer.ip, ':', peer.port, ': ', error));
+
   socket.connect(peer.port, peer.ip, () => {
     console.log('connected to ', peer.ip, ':', peer.port);
+
     socket.write(message.buildHandshake(torrent));
   });
 
+  const queue = {choked: true, queue: []};
   onWholeMsg(socket, data => {
-    msgHandler(data, socket);
+    msgHandler(data, socket, pieces, queue);
   });
 }
 
-function msgHandler(msg, socket) {
+function msgHandler(msg, socket, pieces, queue) {
  if(isHandshake(msg)) {
    socket.write(message.buildInterested());
  } else {
@@ -31,11 +37,11 @@ function msgHandler(msg, socket) {
 
    switch (id) {
      case 0: {
-       chokeHandler();
+       chokeHandler(socket);
        break;
      }
      case 1: {
-       unchokeHandler();
+       unchokeHandler(socket, pieces, queue);
        break;
      }
      case 4: {
@@ -54,24 +60,45 @@ function msgHandler(msg, socket) {
  }
 }
 
-function chokeHandler() {
-
+function chokeHandler(socket) {
+  socket.end();
 }
 
-function unchokeHandler() {
-
+function unchokeHandler(socket, pieces, queue) {
+  queue.choked = false;
+  requestPiece(socket, pieces, queue);
 }
 
-function haveHandler() {
-
+function haveHandler(payload, socket, requested, queue) {
+  const pieceIndex = payload.readUInt32BE(0);
+  queue.push(pieceIndex);
+  if (queue.length === 1) {
+    requestPiece(socket, requested, queue);
+  }
 }
 
 function bitfieldHandler() {
 
 }
 
-function pieceHandler() {
+function pieceHandler(payload, socket, requested, queue) {
+  queue.shift();
+  requestPiece(socket, requested, queue);
+}
 
+function requestPiece(socket, pieces, queue) {
+  if (queue.choked) {
+    return null;
+  }
+
+  while (queue.queue.length) {
+    const pieceIndex = queue.shift();
+    if (pieces.needed(pieceIndex)) {
+      socket.write(message.buildRequest(pieceIndex));
+      pieces.addRequested(pieceIndex);
+      break;
+    }
+  }
 }
 
 function isHandshake(msg) {
