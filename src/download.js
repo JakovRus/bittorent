@@ -10,6 +10,7 @@ module.exports = (torrent, path) => {
   tracker.getPeers(torrent, peers => {
     const pieces = new Pieces(torrent);
     const file = fs.openSync(path, 'w');
+
     peers.forEach(peer => download(peer, torrent, pieces, file));
   });
 };
@@ -17,10 +18,10 @@ module.exports = (torrent, path) => {
 function download(peer, torrent, pieces, file) {
   const socket = new net.Socket();
 
-  socket.on('error', error => console.log('In ', peer.ip, ':', peer.port, ': ', error));
+  socket.on('error', () => console.log(`Refused to connect to ${peer.ip}:${peer.port}`));
 
   socket.connect(peer.port, peer.ip, () => {
-    console.log('connected to ', peer.ip, ':', peer.port);
+    console.log(`Connected to ${peer.ip}:${peer.port}`);
 
     socket.write(message.buildHandshake(torrent));
   });

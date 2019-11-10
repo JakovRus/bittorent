@@ -4,14 +4,12 @@ const util = require('./util');
 
 module.exports.buildHandshake = torrent => {
   const buf = Buffer.alloc(68);
-
   buf.writeUInt8(19, 0);
   buf.write('BitTorrent protocol', 1);
   buf.writeUInt32BE(0, 20);
   buf.writeUInt32BE(0, 24);
   torrentParser.infoHash(torrent).copy(buf, 28);
-  buf.write(util.genId());
-
+  util.genId().copy(buf, 48);
   return buf;
 };
 
