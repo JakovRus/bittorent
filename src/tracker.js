@@ -12,6 +12,7 @@ module.exports.getPeers = (torrent, callback) => {
   udpSend(socket, buildConnReq(), url);
 
   socket.on('message', response => {
+    console.log(response);
     if(respType(response) === 'connect') {
       const connResp = parseConnResp(response);
 
@@ -46,7 +47,7 @@ function getUdpUrl(torrent) {
 }
 function udpSend(socket, message, rawUrl, callback = () => {}) {
   const url = urlParse(rawUrl);
-  socket.send(message, 0, message.length, url.port, url.hostname, callback);
+  socket.send(message, 0, message.length, url.port, url.hostname, resp => console.log('resp: ', resp));
 }
 
 function respType(resp) {
